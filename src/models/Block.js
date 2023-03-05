@@ -34,6 +34,26 @@ class Block {
   _setHash() {
     this.hash = sha256(this.nonce + this.parentHash).toString()
   }
+  
+  _addBlock(block) {
+    if (!block.isValid())
+      return
+    if (this.containsBlock(block))
+      return
+
+    // check that the parent is actually existent and the advertised height is correct
+    const parent = this.blocks[block.parentHash];
+    if (parent === undefined && parent.height + 1 !== block.height )
+      return
+
+    // Add coinbase coin to the pool of the parent
+    const newUtxoPool = parent.utxoPool.clone();
+    newUtxoPool.addUTXO(block.coinbaseBeneficiary, 12.5)
+    block.utxoPool = newUtxoPool;
+
+    this.blocks[block.hash] = block;
+    rerender()
+  }
 }
 
 export default Block
