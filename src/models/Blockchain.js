@@ -1,10 +1,11 @@
+import Block from './Block'
+import { blockFromJSON } from './Block'
+import { transactionFromJSON } from './Transaction'
+import { rerender } from '../store'
+import { publish, subscribeTo } from '../network'
 import { maxBy, reduce, unfold, reverse, values, prop } from 'ramda'
-import { publish, subscribeTo } from "../network";
-import { blockFromJSON } from "./Block";
-import { transactionFromJSON } from "./Transaction";
-// Blockchain
+
 class Blockchain {
-  // 构造函数
   constructor(name) {
     this.name = name
     this.genesis = null
@@ -37,10 +38,14 @@ class Blockchain {
     })
   }
 
-  longestChain() {
+  maxHeightBlock() {
     const blocks = values(this.blocks)
     const maxByHeight = maxBy(prop('height'))
     const maxHeightBlock = reduce(maxByHeight, blocks[0], blocks)
+    return maxHeightBlock
+  }
+
+  longestChain() {
     const getParent = (x) => {
       if (x === undefined) {
         return false
@@ -48,7 +53,7 @@ class Blockchain {
 
       return [x, this.blocks[x.parentHash]]
     }
-    return reverse(unfold(getParent, maxHeightBlock))
+    return reverse(unfold(getParent, this.maxHeightBlock()))
   }
 
   createGenesisBlock() {
@@ -66,8 +71,25 @@ class Blockchain {
     return this.blocks[block.hash] !== undefined
   }
 
+  addBlock(newBlock) {
+    this._addBlock(newBlock)
+    publish('BLOCKS_BROADCAST', {
+      blocks: [newBlock.toJSON()],
+      blockchainName: this.name,
+    })
+  }
+
   _addBlock(block) {
-    // ...
+    if (!block.isValid()) return
+    if (this.containsBlock(block)) return
+
+    // check that the parent is actually existent and the advertised height is correct
+    const parent = this.blocks[block.parentHash]
+    if (parent === undefined && parent.height + 1 !== block.height) return
+
+    const isParentMaxHeight = this.maxHeightBlock().hash === parent.hash
+
+    // clone the utxo pool of the parent and reconcile with the block
     const newUtxoPool = parent.utxoPool.clone()
     block.utxoPool = newUtxoPool
 
@@ -80,14 +102,12 @@ class Blockchain {
     let containsInvalidTransactions = false
 
     Object.values(transactions).forEach((transaction) => {
-      if (
-        block.isValidTransaction(transaction.inputPublicKey, transaction.amount)
-      ) {
-        block.addTransaction(
-          transaction.inputPublicKey,
-          transaction.outputPublicKey,
-          transaction.amount,
-        )
+      if (block.isValidTransaction(transaction)) {
+        block.addTransaction(transaction)
+
+        // if we have the transaction as a pending one on the chain, remove it from the pending pool if we are at max height
+        if (isParentMaxHeight && this.pendingTransactions[transaction.hash])
+          delete this.pendingTransactions[transaction.hash]
       } else {
         containsInvalidTransactions = true
       }
@@ -95,8 +115,9 @@ class Blockchain {
 
     // If we found any invalid transactions, dont add the block
     if (containsInvalidTransactions) return
-    // ...
+
+    this.blocks[block.hash] = block
+    rerender()
   }
 }
-
 export default Blockchain

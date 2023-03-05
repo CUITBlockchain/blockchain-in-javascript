@@ -1,11 +1,11 @@
+import { clone } from 'ramda'
 import UTXO from './UTXO'
 
-class UTXOPool {
+export default class UTXOPool {
   constructor(utxos = {}) {
     this.utxos = utxos
   }
 
-  // 添加 UTXO 交易
   addUTXO(publicKey, amount) {
     if (this.utxos[publicKey]) {
       this.utxos[publicKey].amount += amount
@@ -15,16 +15,8 @@ class UTXOPool {
     }
   }
 
-  // 处理交易
   handleTransaction(transaction, feeReceiver) {
-    if (
-      !this.isValidTransaction(
-        transaction.inputPublicKey,
-        transaction.amount,
-        transaction.fee,
-      )
-    )
-      return
+    if (!this.isValidTransaction(transaction)) return
     const inputUTXO = this.utxos[transaction.inputPublicKey]
     inputUTXO.amount -= transaction.amount
     inputUTXO.amount -= transaction.fee
@@ -33,15 +25,22 @@ class UTXOPool {
     this.addUTXO(feeReceiver, transaction.fee)
   }
 
-  // 验证交易合法性
-  isValidTransaction(inputPublicKey, amount) {
+  isValidTransaction(transaction) {
+    const { inputPublicKey, amount, fee } = transaction
     const utxo = this.utxos[inputPublicKey]
-    return utxo !== undefined && utxo.amount >= amount && amount > 0
+    return utxo !== undefined && utxo.amount >= amount + fee && amount > 0
+  }
+
+  addingTransactionErrorMessage(transaction) {
+    const { inputPublicKey, amount, fee } = transaction
+    const utxo = this.utxos[inputPublicKey]
+    if (utxo === undefined) return 'No UTXO was associated with this public key'
+    if (amount <= 0) return 'Amount has to be at least 0'
+    if (utxo.amount < amount + fee)
+      return `UTXO associated with this public key (${utxo.amount}) does not cover desired amount (${amount}) and fee (${fee})`
   }
 
   clone() {
     return new UTXOPool(clone(this.utxos))
   }
 }
-
-export default UTXOPool

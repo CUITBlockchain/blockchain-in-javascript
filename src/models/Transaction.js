@@ -1,7 +1,7 @@
 import sha256 from 'crypto-js/sha256'
-import { verifySignature } from "../crypto";
+import { verifySignature } from '../crypto'
 
-class Transaction {
+export default class Transaction {
   constructor(inputPublicKey, outputPublicKey, amount, fee, signature) {
     this.inputPublicKey = inputPublicKey
     this.outputPublicKey = outputPublicKey
@@ -18,16 +18,6 @@ class Transaction {
     )
   }
 
-  _setHash() {
-    this.hash = this._calculateHash()
-  }
-
-  _calculateHash() {
-    return sha256(
-      this.inputPublicKey + this.outputPublicKey + this.amount,
-    ).toString()
-  }
-
   toJSON() {
     return {
       inputPublicKey: this.inputPublicKey,
@@ -37,6 +27,16 @@ class Transaction {
       hash: this.hash,
       signature: this.signature,
     }
+  }
+
+  _setHash() {
+    this.hash = this._calculateHash()
+  }
+
+  _calculateHash() {
+    return sha256(
+      this.inputPublicKey + this.outputPublicKey + this.amount + this.fee,
+    ).toString()
   }
 }
 
@@ -49,5 +49,3 @@ export function transactionFromJSON(transaction) {
     transaction.signature,
   )
 }
-
-export default Transaction

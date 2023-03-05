@@ -5,58 +5,63 @@ import { transactionFromJSON } from './Transaction'
 
 const DIFFICULTY = 2
 
-// 区块
 class Block {
-  constructor(
-    blockchain,
-    parentHash,
-    nonce = sha256(new Date().getTime().toString()).toString(),
-  ) {
+  constructor(opts) {
+    const {
+      blockchain,
+      parentHash,
+      height,
+      coinbaseBeneficiary,
+      nonce,
+      utxoPool,
+      transactions,
+    } = {
+      coinbaseBeneficiary: 'root',
+      nonce: '',
+      utxoPool: new UTXOPool(),
+      transactions: {},
+      ...opts,
+    }
     this.blockchain = blockchain
     this.nonce = nonce
     this.parentHash = parentHash
-    this.hash = sha256(this.nonce + this.parentHash).toString()
+    this.height = height
+    this.coinbaseBeneficiary = coinbaseBeneficiary
+    this.utxoPool = utxoPool
+    this.transactions = map(transactionFromJSON)(transactions)
+    this._setHash()
+    // for visualization purposes
+    this.expanded = true
   }
 
-  // 验证区块 hash
+  isRoot() {
+    return this.parentHash === 'root'
+  }
   isValid() {
     return (
-      this.parentHash === 'root' ||
+      this.isRoot() ||
       (this.hash.substr(-DIFFICULTY) === '0'.repeat(DIFFICULTY) &&
-        this.hash === sha256(this.nonce + this.parentHash).toString())
+        this.hash === this._calculateHash())
     )
   }
 
-  // 设置 nonce 随机数
-  setNonce(nonce) {
-    this.nonce = nonce
-    this._setHash()
-  }
-
-  // 设置 Hash
-  _setHash() {
-    this.hash = sha256(this.nonce + this.parentHash).toString()
-  }
-
-  // 添加新的区块
   createChild(coinbaseBeneficiary) {
-    return new Block({
+    const block = new Block({
       blockchain: this.blockchain,
       parentHash: this.hash,
       height: this.height + 1,
+      utxoPool: this.utxoPool.clone(),
       coinbaseBeneficiary,
     })
+
+    // For convenience, allow the miner to immediately spend the coinbase coins
+    block.utxoPool.addUTXO(coinbaseBeneficiary, 12.5)
+
+    return block
   }
 
-  // 添加交易
-  addTransaction(inputPublicKey, outputPublicKey, amount, fee) {
-    if (!this.isValidTransaction(inputPublicKey, amount, fee)) return
-    const transaction = new Transaction(
-      inputPublicKey,
-      outputPublicKey,
-      amount,
-      fee,
-    )
+  addTransaction(transaction) {
+    if (!this.isValidTransaction(transaction)) return
     this.transactions[transaction.hash] = transaction
     this.utxoPool.handleTransaction(transaction, this.coinbaseBeneficiary)
     this._setHash()
@@ -69,11 +74,24 @@ class Block {
     )
   }
 
-  // 计算区块 Hash
-  _calculateHash() {
+  addingTransactionErrorMessage(transaction) {
+    if (!transaction.hasValidSignature()) return 'Signature is not valid'
+    return this.utxoPool.addingTransactionErrorMessage(transaction)
+  }
+
+  setNonce(nonce) {
+    this.nonce = nonce
+    this._setHash()
+  }
+
+  combinedTransactionsHash() {
+    if (Object.values(this.transactions).length === 0)
+      return 'No Transactions in Block'
     return sha256(
-      this.nonce + this.parentHash + this.coinbaseBeneficiary,
-    ).toString()
+      Object.values(this.transactions)
+        .map((tx) => tx.hash)
+        .join(''),
+    )
   }
 
   toJSON() {
@@ -89,7 +107,22 @@ class Block {
       ),
     }
   }
+
+  _setHash() {
+    this.hash = this._calculateHash()
+  }
+
+  _calculateHash() {
+    return sha256(
+      this.nonce +
+        this.parentHash +
+        this.coinbaseBeneficiary +
+        this.combinedTransactionsHash(),
+    ).toString()
+  }
 }
+
+export default Block
 
 export function blockFromJSON(blockchain, data) {
   return new Block({
@@ -97,5 +130,3 @@ export function blockFromJSON(blockchain, data) {
     blockchain,
   })
 }
-
-export default Block
