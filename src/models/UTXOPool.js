@@ -1,4 +1,4 @@
-import UTXO from './UTXO';
+import UTXO from './UTXO'
 
 class UTXOPool {
   constructor(utxos = {}) {
@@ -16,14 +16,21 @@ class UTXOPool {
   }
 
   // 处理交易
-  handleTransaction(transaction) {
-    if (!this.isValidTransaction(transaction.inputPublicKey, transaction.amount))
+  handleTransaction(transaction, feeReceiver) {
+    if (
+      !this.isValidTransaction(
+        transaction.inputPublicKey,
+        transaction.amount,
+        transaction.fee,
+      )
+    )
       return
-    const inputUTXO = this.utxos[transaction.inputPublicKey];
+    const inputUTXO = this.utxos[transaction.inputPublicKey]
     inputUTXO.amount -= transaction.amount
-    if (inputUTXO.amount === 0)
-      delete this.utxos[transaction.inputPublicKey]
+    inputUTXO.amount -= transaction.fee
+    if (inputUTXO.amount === 0) delete this.utxos[transaction.inputPublicKey]
     this.addUTXO(transaction.outputPublicKey, transaction.amount)
+    this.addUTXO(feeReceiver, transaction.fee)
   }
 
   // 验证交易合法性

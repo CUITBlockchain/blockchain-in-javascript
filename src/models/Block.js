@@ -48,6 +48,16 @@ class Block {
     })
   }
 
+  // 添加交易
+  addTransaction(inputPublicKey, outputPublicKey, amount, fee) {
+    if (!this.isValidTransaction(inputPublicKey, amount, fee))
+      return
+    const transaction = new Transaction(inputPublicKey, outputPublicKey, amount, fee)
+    this.transactions[transaction.hash] = transaction
+    this.utxoPool.handleTransaction(transaction, this.coinbaseBeneficiary)
+    this._setHash();
+  }
+
   // 计算区块 Hash
   _calculateHash() {
     return sha256(this.nonce + this.parentHash + this.coinbaseBeneficiary).toString()
