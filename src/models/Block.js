@@ -1,9 +1,9 @@
 import sha256 from 'crypto-js/sha256'
-import UTXOPool from "./UTXOPool";
-import { map } from "ramda";
-import { transactionFromJSON } from "./Transaction";
+import UTXOPool from './UTXOPool'
+import { map } from 'ramda'
+import { transactionFromJSON } from './Transaction'
 
-const DIFFICULTY = 2;
+const DIFFICULTY = 2
 
 // 区块
 class Block {
@@ -44,23 +44,36 @@ class Block {
       blockchain: this.blockchain,
       parentHash: this.hash,
       height: this.height + 1,
-      coinbaseBeneficiary
+      coinbaseBeneficiary,
     })
   }
 
   // 添加交易
   addTransaction(inputPublicKey, outputPublicKey, amount, fee) {
-    if (!this.isValidTransaction(inputPublicKey, amount, fee))
-      return
-    const transaction = new Transaction(inputPublicKey, outputPublicKey, amount, fee)
+    if (!this.isValidTransaction(inputPublicKey, amount, fee)) return
+    const transaction = new Transaction(
+      inputPublicKey,
+      outputPublicKey,
+      amount,
+      fee,
+    )
     this.transactions[transaction.hash] = transaction
     this.utxoPool.handleTransaction(transaction, this.coinbaseBeneficiary)
-    this._setHash();
+    this._setHash()
+  }
+
+  isValidTransaction(transaction) {
+    return (
+      this.utxoPool.isValidTransaction(transaction) &&
+      transaction.hasValidSignature()
+    )
   }
 
   // 计算区块 Hash
   _calculateHash() {
-    return sha256(this.nonce + this.parentHash + this.coinbaseBeneficiary).toString()
+    return sha256(
+      this.nonce + this.parentHash + this.coinbaseBeneficiary,
+    ).toString()
   }
 
   toJSON() {
@@ -70,16 +83,19 @@ class Block {
       parentHash: this.parentHash,
       height: this.height,
       coinbaseBeneficiary: this.coinbaseBeneficiary,
-      transactions: map(transaction => transaction.toJSON(), this.transactions)
-    };
+      transactions: map(
+        (transaction) => transaction.toJSON(),
+        this.transactions,
+      ),
+    }
   }
 }
 
 export function blockFromJSON(blockchain, data) {
   return new Block({
     ...data,
-    blockchain
-  });
+    blockchain,
+  })
 }
 
 export default Block
