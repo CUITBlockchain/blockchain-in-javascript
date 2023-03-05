@@ -5,6 +5,7 @@ class UTXOPool {
     this.utxos = utxos
   }
 
+  // 添加 UTXO 交易
   addUTXO(publicKey, amount) {
     if (this.utxos[publicKey]) {
       this.utxos[publicKey].amount += amount
@@ -12,6 +13,23 @@ class UTXOPool {
       const utxo = new UTXO(publicKey, amount)
       this.utxos[publicKey] = utxo
     }
+  }
+
+  // 处理交易
+  handleTransaction(transaction) {
+    if (!this.isValidTransaction(transaction.inputPublicKey, transaction.amount))
+      return
+    const inputUTXO = this.utxos[transaction.inputPublicKey];
+    inputUTXO.amount -= transaction.amount
+    if (inputUTXO.amount === 0)
+      delete this.utxos[transaction.inputPublicKey]
+    this.addUTXO(transaction.outputPublicKey, transaction.amount)
+  }
+
+  // 验证交易合法性
+  isValidTransaction(inputPublicKey, amount) {
+    const utxo = this.utxos[inputPublicKey]
+    return utxo !== undefined && utxo.amount >= amount && amount > 0
   }
 
   clone() {
