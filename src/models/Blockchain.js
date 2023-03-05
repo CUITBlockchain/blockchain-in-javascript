@@ -2,6 +2,15 @@ import { maxBy, reduce, unfold, reverse, values, prop } from 'ramda'
 
 // Blockchain
 class Blockchain {
+  constructor(name) {
+    this.name = name;
+    this.genesis = null;
+    this.blocks = {};
+
+    this.pendingTransactions = {};
+
+  }
+
   longestChain() {
     const blocks = values(this.blocks)
     const maxByHeight = maxBy(prop('height'))
