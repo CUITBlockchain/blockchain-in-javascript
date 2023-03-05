@@ -50,8 +50,7 @@ class Block {
 
   // 添加交易
   addTransaction(inputPublicKey, outputPublicKey, amount, fee) {
-    if (!this.isValidTransaction(inputPublicKey, amount, fee))
-      return
+    
     const transaction = new Transaction(inputPublicKey, outputPublicKey, amount, fee)
     this.transactions[transaction.hash] = transaction
     this.utxoPool.handleTransaction(transaction, this.coinbaseBeneficiary)
